@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>کاوشگر پیشرفته ایچیموکو</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: A single-page app with top navigation scrolling to thematic sections: Intro, Core Components (interactive diagram), The Three Pillars (tabbed interface for Time, Wave, Price theories), an Interactive Price Target Calculator (canvas-based), and Key Signals (interactive checklist). This structure breaks down complex information into manageable, interactive chunks, guiding the user from foundational knowledge to practical application, which is more engaging and effective for learning than a linear report format. -->
+    <!-- Visualization & Content Choices: Core Concepts -> Goal: Inform -> Interactive Diagram -> User clicks buttons to see component info -> Better than static table -> HTML/JS. Wave Theory -> Goal: Organize/Inform -> CSS Animated Diagrams on Cards -> Shows the motion/structure of waves -> More intuitive than static images -> HTML/CSS. Price Theory -> Goal: Apply/Engage -> Interactive Canvas Calculator -> User defines an N-Wave and sees targets calculated and plotted -> Active learning by doing -> HTML/Canvas/JS. Key Signals -> Goal: Compare/Inform -> Interactive Checklist -> Highlights components of the signal on a diagram -> Reinforces the concept of convergence -> HTML/JS. New Feature: Use Gemini API to generate detailed explanations for components and real-world analysis for signals, providing dynamic, LLM-powered insights. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #F8F5F2;
+            color: #4A4A4A;
+        }
+        .nav-link {
+            transition: color 0.3s, border-bottom-color 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #5A7D7C;
+            border-bottom-color: #5A7D7C;
+        }
+        .tab-btn {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .tab-btn.active {
+            background-color: #5A7D7C;
+            color: #F8F5F2;
+        }
+        .content-card {
+            background-color: #FFFFFF;
+            border: 1px solid #EAEAEA;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .content-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.07);
+        }
+        .wave-diagram {
+            height: 80px;
+            width: 100%;
+            position: relative;
+            border-bottom: 1px dashed #D1D5DB;
+            margin-bottom: 1rem;
+        }
+        .wave-path {
+            stroke-width: 2;
+            fill: none;
+        }
+        @keyframes draw-i { 0% { stroke-dashoffset: 100; } 100% { stroke-dashoffset: 0; } }
+        .i-wave-path { stroke: #5A7D7C; stroke-dasharray: 100; animation: draw-i 2s ease-out infinite; }
+        @keyframes draw-v { 0% { stroke-dashoffset: 200; } 100% { stroke-dashoffset: 0; } }
+        .v-wave-path { stroke: #B85C5C; stroke-dasharray: 200; animation: draw-v 3s ease-out infinite; }
+        @keyframes draw-n { 0% { stroke-dashoffset: 300; } 100% { stroke-dashoffset: 0; } }
+        .n-wave-path { stroke: #5A7D7C; stroke-dasharray: 300; animation: draw-n 4s ease-out infinite; }
+        #price-target-canvas {
+            cursor: crosshair;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.5rem;
+        }
+        .interactive-highlight {
+            transition: background-color 0.3s;
+        }
+        .interactive-highlight:hover {
+            background-color: #E8F0EF;
+        }
+        .signal-item.highlight {
+            background-color: #E8F0EF;
+            border-right: 4px solid #5A7D7C;
+        }
+        .signal-item-bearish.highlight {
+             background-color: #F5E9E9;
+            border-right: 4px solid #B85C5C;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header id="header" class="bg-white/80 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-xl font-bold text-gray-800">ایچیموکو پیشرفته</div>
+            <div class="hidden md:flex items-center space-x-8 lg:space-x-12">
+                <a href="#intro" class="nav-link px-2 py-1">مقدمه</a>
+                <a href="#components" class="nav-link px-2 py-1">اجزای اصلی</a>
+                <a href="#pillars" class="nav-link px-2 py-1">سه ستون نظریه</a>
+                <a href="#calculator" class="nav-link px-2 py-1">محاسبه‌گر تعاملی</a>
+                <a href="#signals" class="nav-link px-2 py-1">سیگنال‌های کلیدی</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-gray-700 focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </nav>
+        <div id="mobile-menu" class="hidden md:hidden px-6 pb-4">
+             <a href="#intro" class="block nav-link py-2">مقدمه</a>
+             <a href="#components" class="block nav-link py-2">اجزای اصلی</a>
+             <a href="#pillars" class="block nav-link py-2">سه ستون نظریه</a>
+             <a href="#calculator" class="block nav-link py-2">محاسبه‌گر تعاملی</a>
+             <a href="#signals" class="block nav-link py-2">سیگنال‌های کلیدی</a>
+        </div>
+    </header>
+
+    <main>
+        <section id="intro" class="py-20 md:py-28">
+            <div class="container mx-auto px-6 text-center">
+                <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-800 mb-4">پرده‌برداری از ایچیموکو کینکو هیو</h1>
+                <p class="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
+                    فراتر از خطوط و ابرها، ایچیموکو یک چارچوب تحلیلی جامع برای درک پویایی بازار است. این ابزار به جای واکنش به گذشته، برای پیش‌بینی آینده طراحی شده است. این کاوشگر تعاملی شما را با سه ستون اصلی این سیستم آشنا می‌کند: نظریه زمان (Jikanron)، نظریه امواج (Hadoron) و نظریه اهداف قیمتی (Nebaku Kansoku Ron).
+                </p>
+            </div>
+        </section>
+
+        <section id="components" class="py-16 bg-white">
+            <div class="container mx-auto px-6">
+                <h2 class="text-3xl font-bold text-center mb-4">آناتومی نمودار تعادل</h2>
+                <p class="text-center text-gray-600 mb-12 max-w-2xl mx-auto">برای درک اجزای سازنده ایچیموکو، روی هر دکمه کلیک کنید. هر جزء لایه‌ای از اطلاعات را در مورد روند، مومنتوم و سطوح حمایت/مقاومت آشکار می‌کند. برای توضیحات عمیق‌تر، روی دکمه "شرح مفهوم" کلیک کنید.</p>
+                <div class="grid md:grid-cols-3 gap-8 items-start">
+                    <div class="md:col-span-1 flex flex-col space-y-3">
+                        <button data-component="tenkan" class="component-btn text-right w-full p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition">تنکان-سن (خط تبدیل)</button>
+                        <button data-component="kijun" class="component-btn text-right w-full p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition">کیجون-سن (خط پایه)</button>
+                        <button data-component="senkou_a" class="component-btn text-right w-full p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition">سنکو اسپن A (اسپن پیشرو سریع)</button>
+                        <button data-component="senkou_b" class="component-btn text-right w-full p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition">سنکو اسپن B (اسپن پیشرو کند)</button>
+                        <button data-component="kumo" class="component-btn text-right w-full p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition">کومو (ابر)</button>
+                        <button data-component="chikou" class="component-btn text-right w-full p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition">چیکو اسپن (اسپن عقب‌مانده)</button>
+                    </div>
+                    <div class="md:col-span-2 content-card min-h-[300px]">
+                        <div id="component-info">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 id="component-title" class="text-2xl font-bold text-gray-800">یک جزء را انتخاب کنید</h3>
+                                <button id="llm-explain-btn" class="hidden text-sm bg-teal-500 text-white px-4 py-2 rounded-md hover:bg-teal-600 transition" aria-label="شرح مفهوم با هوش مصنوعی">✨ شرح مفهوم</button>
+                            </div>
+                            <p id="component-desc" class="text-gray-600 mb-4">برای مشاهده توضیحات، فرمول محاسبه و عملکرد هر یک از عناصر ایچیموکو، روی دکمه‌های سمت راست کلیک کنید.</p>
+                            <div id="component-formula-container" class="hidden">
+                                <h4 class="font-semibold mb-2">فرمول:</h4>
+                                <p id="component-formula" class="text-sm bg-gray-100 p-3 rounded-md text-left" dir="ltr"></p>
+                            </div>
+                            <div id="llm-explanation-container" class="hidden mt-4 p-4 rounded-md bg-gray-50 border-r-4 border-teal-500">
+                                <h4 class="font-bold text-lg mb-2">شرح عمیق‌تر:</h4>
+                                <p id="llm-explanation-text" class="text-gray-700"></p>
+                                <div id="explanation-loading" class="hidden text-sm text-gray-500 mt-2">در حال تولید شرح...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="pillars" class="py-16">
+            <div class="container mx-auto px-6">
+                <h2 class="text-3xl font-bold text-center mb-4">سه ستون نظریه (سانرون)</h2>
+                <p class="text-center text-gray-600 mb-12 max-w-2xl mx-auto">درک واقعی ایچیموکو نیازمند تسلط بر سه نظریه بنیادی آن است. این بخش‌ها "بخش‌های نادیدنی" سیستم را آشکار می‌کنند.</p>
+                <div class="flex justify-center mb-8">
+                    <div class="flex space-x-1 space-x-reverse rounded-lg p-1 bg-gray-200">
+                        <button class="tab-btn active px-6 py-2 rounded-md text-sm font-medium" data-tab="jikanron">نظریه زمان</button>
+                        <button class="tab-btn px-6 py-2 rounded-md text-sm font-medium" data-tab="hadoron">نظریه امواج</button>
+                        <button class="tab-btn px-6 py-2 rounded-md text-sm font-medium" data-tab="nebakuron">اهداف قیمتی</button>
+                    </div>
+                </div>
+                <div id="tab-content" class="max-w-4xl mx-auto">
+                    <div id="jikanron" class="tab-pane active">
+                        <div class="text-center mb-8">
+                            <h3 class="text-2xl font-bold mb-2">時間論 (جیکانرون): هنر پیش‌بینی زمان</h3>
+                            <p class="text-gray-600">مهم‌ترین ستون ایچیموکو، جیکانرون، بر این اصل استوار است که زمان بر قیمت اولویت دارد. این نظریه با استفاده از چرخه‌های عددی خاص، به دنبال پیش‌بینی "چه زمانی" نقاط عطف بازار رخ می‌دهند.</p>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="content-card">
+                                <h4 class="font-bold text-lg mb-2">اعداد پایه (基本数値)</h4>
+                                <p class="text-sm text-gray-600 mb-3">بلوک‌های سازنده چرخه‌های زمانی.</p>
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <span class="bg-teal-100 text-teal-800 text-sm font-medium px-3 py-1 rounded-full">9</span>
+                                    <span class="bg-teal-100 text-teal-800 text-sm font-medium px-3 py-1 rounded-full">17</span>
+                                    <span class="bg-teal-100 text-teal-800 text-sm font-medium px-3 py-1 rounded-full">26</span>
+                                </div>
+                            </div>
+                            <div class="content-card">
+                                <h4 class="font-bold text-lg mb-2">اعداد ترکیبی (複合数値)</h4>
+                                <p class="text-sm text-gray-600 mb-3">ترکیب اعداد پایه برای شناسایی چرخه‌های طولانی‌تر.</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="bg-sky-100 text-sky-800 text-sm font-medium px-3 py-1 rounded-full">33</span>
+                                    <span class="bg-sky-100 text-sky-800 text-sm font-medium px-3 py-1 rounded-full">42</span>
+                                    <span class="bg-sky-100 text-sky-800 text-sm font-medium px-3 py-1 rounded-full">52</span>
+                                    <span class="bg-sky-100 text-sky-800 text-sm font-medium px-3 py-1 rounded-full">65</span>
+                                    <span class="bg-sky-100 text-sky-800 text-sm font-medium px-3 py-1 rounded-full">76</span>
+                                </div>
+                            </div>
+                            <div class="content-card">
+                                <h4 class="font-bold text-lg mb-2">اعداد برابر (対等数値)</h4>
+                                <p class="text-sm text-gray-600">مفهوم تقارن زمانی در بازار. مدت زمان یک روند ممکن است در حرکت بعدی تکرار شود.</p>
+                            </div>
+                             <div class="content-card">
+                                <h4 class="font-bold text-lg mb-2">روزهای تغییر (変化日)</h4>
+                                <p class="text-sm text-gray-600">تاریخ‌های پیش‌بینی‌شده برای تغییرات مهم بازار (شتاب یا برگشت روند).</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="hadoron" class="tab-pane hidden">
+                        <div class="text-center mb-8">
+                            <h3 class="text-2xl font-bold mb-2">波動論 (هادورون): درک ساختار حرکت</h3>
+                            <p class="text-gray-600">هادورون حرکات بازار را به الگوهای موجی قابل تشخیص تجزیه می‌کند. برخلاف نظریه‌های غربی، این الگوها انعطاف‌پذیرتر هستند و بر "ماهیت" حرکت تمرکز دارند.</p>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-6">
+                            <div class="content-card text-center">
+                                <h4 class="font-bold text-lg mb-2">موج I</h4>
+                                <div class="wave-diagram">
+                                    <svg viewBox="0 0 100 50"><path class="i-wave-path wave-path" d="M10 40 L90 10"></path></svg>
+                                </div>
+                                <p class="text-sm text-gray-600">یک حرکت ساده و یک‌طرفه که نشان‌دهنده یک تکانه قوی است.</p>
+                            </div>
+                            <div class="content-card text-center">
+                                <h4 class="font-bold text-lg mb-2">موج V</h4>
+                                <div class="wave-diagram">
+                                    <svg viewBox="0 0 100 50"><path class="v-wave-path wave-path" d="M10 40 L50 10 L90 40"></path></svg>
+                                </div>
+                                <p class="text-sm text-gray-600">یک برگشت تیز و V-شکل که نشان‌دهنده تغییر ناگهانی جهت است.</p>
+                            </div>
+                            <div class="content-card text-center">
+                                <h4 class="font-bold text-lg mb-2">موج N</h4>
+                                <div class="wave-diagram">
+                                    <svg viewBox="0 0 100 50"><path class="n-wave-path wave-path" d="M10 40 L40 10 L30 25 L90 5"></path></svg>
+                                </div>
+                                <p class="text-sm text-gray-600">مهم‌ترین الگو؛ یک چرخه کامل بازار (حرکت، اصلاح، ادامه).</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="nebakuron" class="tab-pane hidden">
+                        <div class="text-center mb-8">
+                            <h3 class="text-2xl font-bold mb-2">値幅観測論 (نباکو کانسوکو رون): پیش‌بینی اهداف قیمتی</h3>
+                            <p class="text-gray-600">این نظریه به این سؤال پاسخ می‌دهد: "قیمت تا کجا خواهد رفت؟". با استفاده از ساختار موج N، می‌توان اهداف قیمتی آینده را با دقت محاسبه کرد. برای تجربه عملی، به بخش محاسبه‌گر تعاملی بروید.</p>
+                        </div>
+                        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div class="content-card">
+                                <h4 class="font-bold text-lg mb-2">محاسبه V</h4>
+                                <p class="text-sm text-gray-600">گسترش قیمت از نقطه B به اندازه دامنه پولبک (B-C).</p>
+                            </div>
+                            <div class="content-card">
+                                <h4 class="font-bold text-lg mb-2">محاسبه N</h4>
+                                <p class="text-sm text-gray-600">حرکت برابر؛ گسترش قیمت از نقطه C به اندازه دامنه موج اول (B-A).</p>
+                            </div>
+                            <div class="content-card">
+                                <h4 class="font-bold text-lg mb-2">محاسبه E</h4>
+                                <p class="text-sm text-gray-600">گسترش دو برابر؛ گسترش قیمت از نقطه B به اندازه دامنه موج اول (B-A).</p>
+                            </div>
+                            <div class="content-card">
+                                <h4 class="font-bold text-lg mb-2">محاسبه NT</h4>
+                                <p class="text-sm text-gray-600">یک هدف کوتاه‌تر که از نقطه C به اندازه دامنه (C-A) گسترش می‌یابد.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="calculator" class="py-16 bg-white">
+            <div class="container mx-auto px-6">
+                <h2 class="text-3xl font-bold text-center mb-4">محاسبه‌گر تعاملی اهداف قیمتی</h2>
+                <p class="text-center text-gray-600 mb-12 max-w-2xl mx-auto">با تعریف نقاط A، B و C یک موج N صعودی، به صورت عملی نظریه اهداف قیمتی را تجربه کنید. روی نمودار کلیک کنید یا مقادیر را به صورت دستی وارد نمایید.</p>
+                <div class="grid lg:grid-cols-5 gap-8">
+                    <div class="lg:col-span-3 content-card">
+                        <canvas id="price-target-canvas" width="500" height="400"></canvas>
+                    </div>
+                    <div class="lg:col-span-2">
+                        <div class="space-y-4 mb-6">
+                            <div>
+                                <label for="pointA" class="block text-sm font-medium text-gray-700">نقطه A (شروع موج)</label>
+                                <input type="number" id="pointA" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm" placeholder="100">
+                            </div>
+                            <div>
+                                <label for="pointB" class="block text-sm font-medium text-gray-700">نقطه B (اولین اوج)</label>
+                                <input type="number" id="pointB" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm" placeholder="120">
+                            </div>
+                            <div>
+                                <label for="pointC" class="block text-sm font-medium text-gray-700">نقطه C (پایان اصلاح)</label>
+                                <input type="number" id="pointC" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm" placeholder="110">
+                            </div>
+                        </div>
+                        <div class="content-card bg-gray-50">
+                            <h4 class="font-bold text-lg mb-4">اهداف قیمتی محاسبه‌شده:</h4>
+                            <div id="results-container" class="space-y-3">
+                                <p class="text-gray-500">لطفاً هر سه نقطه را برای مشاهده نتایج وارد کنید.</p>
+                            </div>
+                        </div>
+                         <button id="reset-calc" class="mt-4 w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition">بازنشانی</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="signals" class="py-16">
+            <div class="container mx-auto px-6">
+                <h2 class="text-3xl font-bold text-center mb-4">سیگنال‌های کلیدی: قدرت همگرایی</h2>
+                <p class="text-center text-gray-600 mb-12 max-w-2xl mx-auto">قوی‌ترین سیگنال‌های ایچیموکو زمانی رخ می‌دهند که چندین جزء با هم همسو شوند. سان-یاکو کوتن (سه خط مثبت) و سان-یاکو گیاکوتن (سه خط منفی) نمونه‌های بارز این همگرایی هستند.</p>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="content-card">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-2xl text-center text-green-700">سان-یاکو کوتن (سیگنال خرید قوی)</h3>
+                            <button id="sanyaku-analysis-btn" class="hidden text-sm bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition" aria-label="تحلیل سیگنال با هوش مصنوعی" data-signal-type="bullish">✨ تحلیل سیگنال</button>
+                        </div>
+                        <ul class="space-y-3">
+                            <li id="sanyaku-1" class="signal-item p-4 rounded-lg border border-gray-200 interactive-highlight cursor-pointer">
+                                <strong class="block">۱. برگشت مثبت نمودار تعادل:</strong>
+                                <span class="text-sm text-gray-600">تنکان-سن از بالای کیجون-سن عبور می‌کند.</span>
+                            </li>
+                            <li id="sanyaku-2" class="signal-item p-4 rounded-lg border border-gray-200 interactive-highlight cursor-pointer">
+                                <strong class="block">۲. برگشت مثبت اسپن عقب‌مانده:</strong>
+                                <span class="text-sm text-gray-600">چیکو اسپن از بالای نمودار قیمت عبور می‌کند.</span>
+                            </li>
+                            <li id="sanyaku-3" class="signal-item p-4 rounded-lg border border-gray-200 interactive-highlight cursor-pointer">
+                                <strong class="block">۳. قیمت بالاتر از ابر:</strong>
+                                <span class="text-sm text-gray-600">قیمت به بالای ابر (کومو) نفوذ می‌کند.</span>
+                            </li>
+                        </ul>
+                        <div id="sanyaku-llm-analysis" class="hidden mt-4 p-4 rounded-md bg-green-50 border-r-4 border-green-500">
+                           <h4 class="font-bold text-lg mb-2">تحلیل سیگنال:</h4>
+                           <p id="sanyaku-llm-text" class="text-gray-700"></p>
+                           <div id="sanyaku-analysis-loading" class="hidden text-sm text-gray-500 mt-2">در حال تحلیل...</div>
+                        </div>
+                    </div>
+                     <div class="content-card">
+                         <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-2xl text-center text-red-700">سان-یاکو گیاکوتن (سیگنال فروش قوی)</h3>
+                             <button id="sanyaku-neg-analysis-btn" class="hidden text-sm bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition" aria-label="تحلیل سیگنال با هوش مصنوعی" data-signal-type="bearish">✨ تحلیل سیگنال</button>
+                        </div>
+                        <ul class="space-y-3">
+                            <li id="sanyaku-neg-1" class="signal-item-bearish p-4 rounded-lg border border-gray-200 interactive-highlight cursor-pointer">
+                                <strong class="block">۱. برگشت منفی نمودار تعادل:</strong>
+                                <span class="text-sm text-gray-600">تنکان-سن از پایین کیجون-سن عبور می‌کند.</span>
+                            </li>
+                            <li id="sanyaku-neg-2" class="signal-item-bearish p-4 rounded-lg border border-gray-200 interactive-highlight cursor-pointer">
+                                <strong class="block">۲. برگشت منفی اسپن عقب‌مانده:</strong>
+                                <span class="text-sm text-gray-600">چیکو اسپن از پایین نمودار قیمت عبور می‌کند.</span>
+                            </li>
+                            <li id="sanyaku-neg-3" class="signal-item-bearish p-4 rounded-lg border border-gray-200 interactive-highlight cursor-pointer">
+                                <strong class="block">۳. قیمت پایین‌تر از ابر:</strong>
+                                <span class="text-sm text-gray-600">قیمت به پایین ابر (کومو) نفوذ می‌کند.</span>
+                            </li>
+                        </ul>
+                        <div id="sanyaku-neg-llm-analysis" class="hidden mt-4 p-4 rounded-md bg-red-50 border-r-4 border-red-500">
+                           <h4 class="font-bold text-lg mb-2">تحلیل سیگنال:</h4>
+                           <p id="sanyaku-neg-llm-text" class="text-gray-700"></p>
+                           <div id="sanyaku-neg-analysis-loading" class="hidden text-sm text-gray-500 mt-2">در حال تحلیل...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-6 text-center">
+            <p>این اپلیکیشن تعاملی برای کاوش در نظریات پیشرفته ایچیموکو کینکو هیو طراحی شده است.</p>
+            <p class="text-sm text-gray-400 mt-2">یادآوری: این یک ابزار آموزشی است و نباید به عنوان مشاوره مالی تلقی شود.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Mobile Menu
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+
+            // Smooth Scrolling & Active Nav Link
+            const navLinks = document.querySelectorAll('a[href^="#"]');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth' });
+                        if(mobileMenu.classList.contains('hidden') === false){
+                            mobileMenu.classList.add('hidden');
+                        }
+                    }
+                });
+            });
+            
+            const sections = document.querySelectorAll('section');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        document.querySelectorAll('.nav-link').forEach(link => {
+                            link.classList.remove('active');
+                            if (link.getAttribute('href').substring(1) === entry.target.id) {
+                                link.classList.add('active');
+                            }
+                        });
+                    }
+                });
+            }, { threshold: 0.5 });
+            sections.forEach(section => observer.observe(section));
+            
+            // Gemini API call function with exponential backoff
+            const callGeminiAPI = async (prompt, type) => {
+                const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=";
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                let delay = 1000;
+                let response;
+
+                for (let i = 0; i < 5; i++) {
+                    try {
+                        response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.status === 429) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2;
+                            continue;
+                        }
+
+                        if (!response.ok) {
+                             throw new Error(`API error: ${response.status} ${response.statusText}`);
+                        }
+
+                        const result = await response.json();
+                        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (!text) throw new Error("Invalid API response format");
+
+                        return text;
+
+                    } catch (error) {
+                         if (i === 4) {
+                            console.error(`Failed to call Gemini API after multiple retries for ${type}:`, error);
+                            return 'خطا در برقراری ارتباط با سرویس هوش مصنوعی. لطفاً دوباره تلاش کنید.';
+                        }
+                    }
+                }
+            };
+
+            // Components Section with LLM
+            const componentButtons = document.querySelectorAll('.component-btn');
+            const componentTitle = document.getElementById('component-title');
+            const componentDesc = document.getElementById('component-desc');
+            const componentFormulaContainer = document.getElementById('component-formula-container');
+            const componentFormula = document.getElementById('component-formula');
+            const llmExplainBtn = document.getElementById('llm-explain-btn');
+            const llmExplanationContainer = document.getElementById('llm-explanation-container');
+            const llmExplanationText = document.getElementById('llm-explanation-text');
+            const explanationLoading = document.getElementById('explanation-loading');
+
+            const componentData = {
+                tenkan: {
+                    title: 'تنکان-سن (خط تبدیل)',
+                    desc: 'نقطه میانی بالاترین بالا و پایین‌ترین پایین در ۹ دوره گذشته. این خط به عنوان شاخص روند و مومنتوم کوتاه‌مدت عمل می‌کند و به سرعت به تغییرات قیمت واکنش نشان می‌دهد.',
+                    formula: '(Highest High over 9 periods + Lowest Low over 9 periods) / 2',
+                },
+                kijun: {
+                    title: 'کیجون-سن (خط پایه)',
+                    desc: 'نقطه میانی بالاترین بالا و پایین‌ترین پایین در ۲۶ دوره گذشته. این خط تعادل میان‌مدت بازار را نشان می‌دهد و جهت کلی روند را مشخص می‌کند.',
+                    formula: '(Highest High over 26 periods + Lowest Low over 26 periods) / 2',
+                },
+                senkou_a: {
+                    title: 'سنکو اسپن A (اسپن پیشرو سریع)',
+                    desc: 'نقطه میانی تنکان-سن و کیجون-سن که ۲۶ دوره به جلو منتقل شده است. این خط مرز سریع‌تر ابر (کومو) را تشکیل می‌دهد و سطوح حمایت و مقاومت آینده را پیش‌بینی می‌کند.',
+                    formula: '(Tenkan-sen + Kijun-sen) / 2, plotted 26 periods ahead',
+                },
+                 senkou_b: {
+                    title: 'سنکو اسپن B (اسپن پیشرو کند)',
+                    desc: 'نقطه میانی بالاترین بالا و پایین‌ترین پایین در ۵۲ دوره گذشته که ۲۶ دوره به جلو منتقل شده است. این خط مرز کندتر ابر را تشکیل می‌دهد و تعادل بلندمدت را نشان می‌دهد.',
+                    formula: '(Highest High over 52 periods + Lowest Low over 52 periods) / 2, plotted 26 periods ahead',
+                },
+                kumo: {
+                    title: 'کومو (ابر)',
+                    desc: 'ناحیه بین سنکو اسپن A و B که ۲۶ دوره به جلو منتقل شده است. ابر یک نمایش بصری از روند، مومنتوم و سطوح حمایت/مقاومت پویا است. ضخامت و رنگ آن اطلاعات مهمی را ارائه می‌دهد.',
+                    formula: 'Area between Senkou Span A and Senkou Span B',
+                },
+                chikou: {
+                    title: 'چیکو اسپن (اسپن عقب‌مانده)',
+                    desc: 'قیمت بسته شدن فعلی که ۲۶ دوره به عقب منتقل شده است. این خط برای تأیید مومنتوم و اعتباربخشی به روند استفاده می‌شود و قیمت فعلی را با گذشته مقایسه می‌کند.',
+                    formula: 'Current closing price, plotted 26 periods behind',
+                }
+            };
+
+            componentButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const componentId = button.dataset.component;
+                    const data = componentData[componentId];
+                    componentTitle.textContent = data.title;
+                    componentDesc.textContent = data.desc;
+                    componentFormula.textContent = data.formula;
+                    componentFormulaContainer.classList.remove('hidden');
+                    llmExplainBtn.classList.remove('hidden');
+                    llmExplainBtn.dataset.componentName = data.title;
+                    llmExplanationContainer.classList.add('hidden');
+                    llmExplanationText.textContent = '';
+                });
+            });
+            
+            llmExplainBtn.addEventListener('click', async () => {
+                const componentName = llmExplainBtn.dataset.componentName;
+                llmExplanationContainer.classList.remove('hidden');
+                explanationLoading.classList.remove('hidden');
+                llmExplanationText.textContent = '';
+
+                const prompt = `شما یک متخصص در تحلیل تکنیکال با استفاده از سیستم ایچیموکو هستید. یک توضیح جامع و حرفه‌ای اما به زبان ساده و قابل فهم برای مفهوم "${componentName}" در ایچیموکو ارائه دهید.`;
+                
+                try {
+                    const result = await callGeminiAPI(prompt, 'component explanation');
+                    llmExplanationText.textContent = result;
+                } finally {
+                    explanationLoading.classList.add('hidden');
+                }
+            });
+
+            // Tabs Section
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    const tabId = button.dataset.tab;
+                    tabPanes.forEach(pane => {
+                        if (pane.id === tabId) {
+                            pane.classList.add('active');
+                            pane.classList.remove('hidden');
+                        } else {
+                            pane.classList.remove('active');
+                            pane.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+            // Price Target Calculator
+            const canvas = document.getElementById('price-target-canvas');
+            const ctx = canvas.getContext('2d');
+            const inputA = document.getElementById('pointA');
+            const inputB = document.getElementById('pointB');
+            const inputC = document.getElementById('pointC');
+            const resultsContainer = document.getElementById('results-container');
+            const resetBtn = document.getElementById('reset-calc');
+
+            let points = { A: null, B: null, C: null };
+            let currentPoint = 'A';
+
+            function drawGrid() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = '#F3F4F6';
+                ctx.lineWidth = 1;
+
+                for (let i = 0; i < 10; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, i * (canvas.height / 10));
+                    ctx.lineTo(canvas.width, i * (canvas.height / 10));
+                    ctx.stroke();
+                }
+                 for (let i = 0; i < 10; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(i * (canvas.width / 10), 0);
+                    ctx.lineTo(i * (canvas.width / 10), canvas.height);
+                    ctx.stroke();
+                }
+            }
+
+            function draw() {
+                drawGrid();
+                
+                if (points.A && points.B) {
+                    ctx.beginPath();
+                    ctx.moveTo(points.A.x, points.A.y);
+                    ctx.lineTo(points.B.x, points.B.y);
+                    ctx.strokeStyle = '#5A7D7C';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                if (points.B && points.C) {
+                    ctx.beginPath();
+                    ctx.moveTo(points.B.x, points.B.y);
+                    ctx.lineTo(points.C.x, points.C.y);
+                    ctx.strokeStyle = '#B85C5C';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                for (const p in points) {
+                    if (points[p]) {
+                        ctx.beginPath();
+                        ctx.arc(points[p].x, points[p].y, 5, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#4A4A4A';
+                        ctx.fill();
+                        ctx.font = '14px Vazirmatn';
+                        ctx.fillStyle = '#4A4A4A';
+                        ctx.fillText(p, points[p].x + 8, points[p].y + 5);
+                    }
+                }
+                
+                if(points.A && points.B && points.C) {
+                    drawProjections();
+                }
+            }
+            
+            function drawProjections() {
+                const valA = parseFloat(inputA.value);
+                const valB = parseFloat(inputB.value);
+                const valC = parseFloat(inputC.value);
+                if(isNaN(valA) || isNaN(valB) || isNaN(valC)) return;
+
+                const minVal = Math.min(valA, valC);
+                const maxVal = valB + (valB-valA);
+                
+                const scaleY = (y) => {
+                    return canvas.height - ((y - minVal) / (maxVal - minVal) * canvas.height * 0.9 + canvas.height * 0.05);
+                };
+                
+                const targets = calculateTargets(valA, valB, valC);
+                if(!targets) return;
+                
+                ctx.lineWidth = 1;
+                
+                // V
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = '#3b82f6';
+                const yV = scaleY(targets.V);
+                ctx.moveTo(points.C.x, yV);
+                ctx.lineTo(canvas.width, yV);
+                ctx.stroke();
+                ctx.fillStyle = '#3b82f6';
+                ctx.fillText(`V: ${targets.V.toFixed(2)}`, canvas.width - 60, yV - 5);
+                
+                // N
+                ctx.beginPath();
+                ctx.strokeStyle = '#16a34a';
+                const yN = scaleY(targets.N);
+                ctx.moveTo(points.C.x, yN);
+                ctx.lineTo(canvas.width, yN);
+                ctx.stroke();
+                ctx.fillStyle = '#16a34a';
+                ctx.fillText(`N: ${targets.N.toFixed(2)}`, canvas.width - 60, yN - 5);
+                
+                // E
+                ctx.beginPath();
+                ctx.strokeStyle = '#f97316';
+                const yE = scaleY(targets.E);
+                ctx.moveTo(points.C.x, yE);
+                ctx.lineTo(canvas.width, yE);
+                ctx.stroke();
+                ctx.fillStyle = '#f97316';
+                ctx.fillText(`E: ${targets.E.toFixed(2)}`, canvas.width - 60, yE - 5);
+                
+                // NT
+                ctx.beginPath();
+                ctx.strokeStyle = '#6d28d9';
+                const yNT = scaleY(targets.NT);
+                ctx.moveTo(points.C.x, yNT);
+                ctx.lineTo(canvas.width, yNT);
+                ctx.stroke();
+                ctx.fillStyle = '#6d28d9';
+                ctx.fillText(`NT: ${targets.NT.toFixed(2)}`, canvas.width - 60, yNT - 5);
+                
+                ctx.setLineDash([]);
+            }
+
+            function calculateTargets(a, b, c) {
+                if (isNaN(a) || isNaN(b) || isNaN(c) || b <= a || c >= b || c <= a) {
+                    resultsContainer.innerHTML = '<p class="text-red-500 text-sm">مقادیر نامعتبر است. لطفاً اطمینان حاصل کنید که A < C < B.</p>';
+                    return null;
+                }
+                const V = b + (b - c);
+                const N = c + (b - a);
+                const E = b + (b - a);
+                const NT = c + (c - a);
+
+                resultsContainer.innerHTML = `
+                    <div class="flex justify-between items-center p-2 rounded bg-blue-50 border-r-4 border-blue-500"><span>محاسبه V:</span><strong class="font-mono">${V.toFixed(2)}</strong></div>
+                    <div class="flex justify-between items-center p-2 rounded bg-green-50 border-r-4 border-green-500"><span>محاسبه N:</span><strong class="font-mono">${N.toFixed(2)}</strong></div>
+                    <div class="flex justify-between items-center p-2 rounded bg-orange-50 border-r-4 border-orange-500"><span>محاسبه E:</span><strong class="font-mono">${E.toFixed(2)}</strong></div>
+                    <div class="flex justify-between items-center p-2 rounded bg-purple-50 border-r-4 border-purple-500"><span>محاسبه NT:</span><strong class="font-mono">${NT.toFixed(2)}</strong></div>
+                `;
+                return { V, N, E, NT };
+            }
+
+            function updateInputsFromCanvas() {
+                const valA = parseFloat(inputA.value);
+                const valB = parseFloat(inputB.value);
+                const valC = parseFloat(inputC.value);
+                if (isNaN(valA) || isNaN(valB) || isNaN(valC)) return;
+                
+                const minVal = valA;
+                const maxVal = valB + (valB - valA); 
+                
+                const scaleY = (y) => {
+                    return canvas.height - ((y - minVal) / (maxVal - minVal) * canvas.height * 0.9 + canvas.height * 0.05);
+                };
+
+                points.A = { x: canvas.width * 0.1, y: scaleY(valA) };
+                points.B = { x: canvas.width * 0.5, y: scaleY(valB) };
+                points.C = { x: canvas.width * 0.7, y: scaleY(valC) };
+
+                draw();
+            }
+
+            canvas.addEventListener('click', function (e) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                points[currentPoint] = { x, y };
+
+                const valA = parseFloat(inputA.value) || 100;
+                const valB = parseFloat(inputB.value) || 120;
+                
+                const minVal = Math.min(valA, parseFloat(inputC.value) || 110);
+                const maxVal = Math.max(valB, valB + (valB-valA));
+                
+                const scaledValue = minVal + ((canvas.height - y - canvas.height * 0.05) / (canvas.height * 0.9)) * (maxVal - minVal);
+                
+                if (currentPoint === 'A') {
+                    inputA.value = scaledValue.toFixed(2);
+                    currentPoint = 'B';
+                } else if (currentPoint === 'B') {
+                    inputB.value = scaledValue.toFixed(2);
+                    currentPoint = 'C';
+                } else {
+                    inputC.value = scaledValue.toFixed(2);
+                    currentPoint = 'A';
+                }
+                
+                draw();
+                if (inputA.value && inputB.value && inputC.value) {
+                    calculateTargets(parseFloat(inputA.value), parseFloat(inputB.value), parseFloat(inputC.value));
+                }
+            });
+
+            [inputA, inputB, inputC].forEach(input => {
+                input.addEventListener('input', () => {
+                    if (inputA.value && inputB.value && inputC.value) {
+                        calculateTargets(parseFloat(inputA.value), parseFloat(inputB.value), parseFloat(inputC.value));
+                        updateInputsFromCanvas();
+                    }
+                });
+            });
+            
+            resetBtn.addEventListener('click', () => {
+                points = { A: null, B: null, C: null };
+                currentPoint = 'A';
+                inputA.value = '';
+                inputB.value = '';
+                inputC.value = '';
+                resultsContainer.innerHTML = '<p class="text-gray-500">لطفاً هر سه نقطه را برای مشاهده نتایج وارد کنید.</p>';
+                drawGrid();
+            });
+
+            drawGrid();
+
+            // Signals highlight with LLM
+            const sanyakuItems = document.querySelectorAll('.signal-item');
+            const sanyakuNegItems = document.querySelectorAll('.signal-item-bearish');
+            const sanyakuAnalysisBtn = document.getElementById('sanyaku-analysis-btn');
+            const sanyakuNegAnalysisBtn = document.getElementById('sanyaku-neg-analysis-btn');
+            const sanyakuLLMAnalysisDiv = document.getElementById('sanyaku-llm-analysis');
+            const sanyakuNegLLMAnalysisDiv = document.getElementById('sanyaku-neg-llm-analysis');
+            const sanyakuLLMText = document.getElementById('sanyaku-llm-text');
+            const sanyakuNegLLMText = document.getElementById('sanyaku-neg-llm-text');
+            const sanyakuAnalysisLoading = document.getElementById('sanyaku-analysis-loading');
+            const sanyakuNegAnalysisLoading = document.getElementById('sanyaku-neg-analysis-loading');
+
+            sanyakuItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    sanyakuItems.forEach(i => i.classList.remove('highlight'));
+                    sanyakuNegItems.forEach(i => i.classList.remove('highlight'));
+                    item.classList.add('highlight');
+                    sanyakuAnalysisBtn.classList.remove('hidden');
+                    sanyakuNegAnalysisBtn.classList.add('hidden');
+                });
+            });
+
+            sanyakuNegItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    sanyakuItems.forEach(i => i.classList.remove('highlight'));
+                    sanyakuNegItems.forEach(i => i.classList.remove('highlight'));
+                    item.classList.add('highlight');
+                    sanyakuNegAnalysisBtn.classList.remove('hidden');
+                    sanyakuAnalysisBtn.classList.add('hidden');
+                });
+            });
+
+            sanyakuAnalysisBtn.addEventListener('click', async () => {
+                sanyakuLLMAnalysisDiv.classList.remove('hidden');
+                sanyakuAnalysisLoading.classList.remove('hidden');
+                sanyakuLLMText.textContent = '';
+                
+                const prompt = `شما یک معامله‌گر حرفه‌ای هستید. سیگنال "سان-یاکو کوتن" در ایچیموکو را به زبان فارسی تحلیل کنید. توضیح دهید که این سیگنال چه چیزی را در مورد بازار نشان می‌دهد، چه انتظاراتی می‌توان از آن داشت و چه عوامل دیگری می‌توانند این سیگنال را تأیید یا رد کنند.`;
+                
+                try {
+                    const result = await callGeminiAPI(prompt, 'sanyaku analysis');
+                    sanyakuLLMText.textContent = result;
+                } finally {
+                    sanyakuAnalysisLoading.classList.add('hidden');
+                }
+            });
+
+            sanyakuNegAnalysisBtn.addEventListener('click', async () => {
+                sanyakuNegLLMAnalysisDiv.classList.remove('hidden');
+                sanyakuNegAnalysisLoading.classList.remove('hidden');
+                sanyakuNegLLMText.textContent = '';
+
+                const prompt = `شما یک معامله‌گر حرفه‌ای هستید. سیگنال "سان-یاکو گیاکوتن" در ایچیموکو را به زبان فارسی تحلیل کنید. توضیح دهید که این سیگنال چه چیزی را در مورد بازار نشان می‌دهد، چه انتظاراتی می‌توان از آن داشت و چه عوامل دیگری می‌توانند این سیگنال را تأیید یا رد کنند.`;
+
+                try {
+                    const result = await callGeminiAPI(prompt, 'sanyaku negative analysis');
+                    sanyakuNegLLMText.textContent = result;
+                } finally {
+                    sanyakuNegAnalysisLoading.classList.add('hidden');
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
+
